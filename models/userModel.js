@@ -13,7 +13,7 @@ const userSchema = mongoose.Schema({
     email: {
         type: String,
         required: true,
-        validate: [validator.isEmail(), 'email address is invalid']
+        validate: [validator.isEmail, 'email address is invalid']
     },
     phone: {
         type: String,

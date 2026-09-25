@@ -22,7 +22,7 @@ const getQueueById = async(queueId) =>{
     return queue;
 }
 
-const getQueuetByCurrentTurn= async (currentTurn,queue)=>{
+const getQueuetByCurrentTurn= async (currentTurn)=>{
     const queue = await Queue.find({currentTurn}).pobulate('createdBy','_id firstName lastName email');
     return queue;
 }
