@@ -21,7 +21,8 @@ const queueSchema = mongoose.Schema({
     },
     currentTurn:{
         type:mongoose.Schema.ObjectId,
-        ref:'Ticket'
+        ref:'Ticket',
+        default:null
     }
 },
     {

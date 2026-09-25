@@ -15,6 +15,11 @@ const ticketSchema = mongoose.Schema({
         type:mongoose.Schema.ObjectId,
         ref:'Queue',
         required:true
+    },
+    prev:{
+        type:mongoose.Schema.ObjectId,
+        ref:'Ticket',
+        default:null
     }
 },
     {
