@@ -17,7 +17,7 @@ const register = async (firstName, lastName, password, email, phone) => {
         role: "normalUser"
     }
     const newUser = new User(data);
-    const token = await createJWT({ email, phone, role: newUser.role });
+    const token = await createJWT({id:newUser._id, email, phone, role: newUser.role });
     await newUser.save();
     return token;
 }
@@ -31,7 +31,7 @@ const login = async (email, password) => {
     if (!isCorrectPassword) {
         throw new AppError("email or password is not matched", 400, "fail");
     }
-    const token = await createJWT({ email, phone: user.phone, role: user.role });
+    const token = await createJWT({id:newUser._id, email, phone: user.phone, role: user.role });
     return token;
 }
 

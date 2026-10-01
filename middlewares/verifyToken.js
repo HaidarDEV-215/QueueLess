@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const AppError = require('../utils/appError.js')
 
-const verifyToken = (req, res, next) => {
+const verifyAuth = (req, res, next) => {
     const authHeader = req.headers['authorization']
     try {
         if (!authHeader) {
@@ -19,5 +19,5 @@ const verifyToken = (req, res, next) => {
 
 
 module.exports = {
-    verifyToken
+    verifyAuth
 }
