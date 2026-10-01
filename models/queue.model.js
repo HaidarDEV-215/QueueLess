@@ -27,8 +27,8 @@ const queueSchema = mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['available', 'closed'],
-        default: 'available'
+        enum: ['open', 'closed'],
+        default: 'open'
     }
 }, {
     timestamps: true

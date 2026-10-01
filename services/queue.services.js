@@ -12,9 +12,9 @@ const getAllTicketsInQueue= async (queueId,limit = 10, page = 1)=>{
 }
 
 const createTicket = async (currentUserId,queueId,status = 'waiting') =>{
-    const queue = await Queue.findById(queueId,{'__v':false});
+    const queue = await Queue.find({_id:queueId,status:'open'},{'__v':false});
     if(!queue){
-        throw new AppError('no queue found!',404,'fail');
+        throw new AppError('cannot find queue or it has been closed!',404,'fail');
     }
     const ticketData = {
         owner:currentUserId,
@@ -40,5 +40,53 @@ const createQueue = async (name,createdBy,capacity,status='available')=>{
     return newQueue;
 }
 
+const updateQueue = async (queueId, data)=>{
+    const queue = await Queue.findById(queueId,{'__v':false});
+    if(!queue){
+        throw new AppError('no queue found!',404,'fail');
+    }
+    const validOptions = ['name','capacity','status'];
+    const updates = {};
+    for (const element of validOptions) {
+        if(data[element]){
+            updates[element] = data[element];
+        }
+    }
+    const updatedQueue = await Queue.findByIdAndUpdate(queueId,updates,{returnDocument:'after',runValidators:true});
+    return updatedQueue;
+}
 
-module.exports = {createTicket,createQueue,getAllTicketsInQueue};
+const cancelTicket = async (ticketId)=>{//rather than delete
+    const ticket = await Ticket.findById(ticketId);
+    if(!ticket){
+        throw new AppError('no tickets found',404,'fail');
+    }
+    const canceledTicket = await Ticket.findByIdAndUpdate(ticketId,{status:'canceled'},{returnDocument:'after',runValidators:true});
+    return canceledTicket;
+}
+
+/**
+ * @todo activate queue
+ * @method post
+ * @description change the first ticket status in the queue to 'serving' if it wasn't canceled,
+ * or skip to next one!
+ * @params queueId
+ */
+
+
+
+/**
+ * @todo swap to next ticket
+ * @method post
+ * @description swap to the ticket which have the same id of current ticket in 'prev' attribut
+ * if it wasn't canceled or skip to next one!
+ * @params queueId
+ */
+
+module.exports = {
+    createTicket,
+    createQueue,
+    getAllTicketsInQueue,
+    updateQueue,
+    cancelTicket
+};
