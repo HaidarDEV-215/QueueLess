@@ -65,6 +65,19 @@ const cancelTicket = async (ticketId,userId)=>{//rather than delete
     return canceledTicket;
 }
 
+const toggleQueueStatus = async (queueId, userId)=>{
+    const queue = await Queue.findOne({_id:queueId, createdBy: userId});
+    if(!queue){
+        throw new AppError('no queue found!',404,'fail');
+    }
+    let newStatus = 'open';
+    if(queue.status === 'open'){
+        newStatus = 'closed';
+    }
+    const updatedQueue = await Queue.findByIdAndUpdate(queueId,{status:newStatus},{runValidators:true, returnDocument:'after'});
+    return updatedQueue;
+}
+
 /**
  * @todo activate queue
  * @method post
@@ -88,5 +101,6 @@ module.exports = {
     createQueue,
     getAllTicketsInQueue,
     updateQueue,
-    cancelTicket
+    cancelTicket,
+    toggleQueueStatus
 };

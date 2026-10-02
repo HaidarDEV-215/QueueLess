@@ -38,6 +38,11 @@ router.route('/manager/:queueId')
         queueValidator.updateQueueValidator(),
         validationHandler,
         queueControllers.updateQueue
-    );
+    )
+    .patch(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueControllers.toggleQueueStatus
+    )
 
 module.exports = router;
