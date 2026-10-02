@@ -45,4 +45,16 @@ router.route('/manager/:queueId')
         queueControllers.toggleQueueStatus
     )
 
+router.route('/manager/activate/:queueId')
+    .put(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueControllers.swapToNextTicket
+    )
+    .post(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueControllers.activateQueue
+    )
+
 module.exports = router;

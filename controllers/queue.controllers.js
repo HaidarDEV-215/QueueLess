@@ -37,11 +37,25 @@ const updateQueue = asyncWrapper(async (req, res, next) => {
     res.status(200).json({ message: 'ticket updated', data: updatedTicket });
 });
 
-const toggleQueueStatus = asyncWrapper(async (req,res, next)=>{
+const toggleQueueStatus = asyncWrapper(async (req, res, next) => {
     const queueId = req.params.queueId;
     const userId = req.currentUser.id;
     const queue = await queueServices.toggleQueueStatus(queueId, userId);
-    res.status(200).json({message:`done.. queue is ${queue.status}`,data:queue});
+    res.status(200).json({ message: `done.. queue is ${queue.status}`, data: queue });
+});
+
+const activateQueue = asyncWrapper(async (req, res, next) => {
+    const queueId = req.params.queueId;
+    const userId = req.currentUser.id;
+    const activeQueue = await queueServices.activateQueue(queueId, userId);
+    res.status(200).json({ message: 'queue has been activated', data: activeQueue });
+});
+
+const swapToNextTicket = asyncWrapper(async (req,res,next)=>{
+    const queueId = req.params.queueId;
+    const userId = req.currentUser.id;
+    const newQueueStatus = await queueServices.swapToNextTicket(queueId,userId);
+    res.status(200).json({ message: 'swapped to next ticket', data: newQueueStatus });
 });
 
 module.exports = {
@@ -50,5 +64,7 @@ module.exports = {
     createQueue,
     cancelTicket,
     updateQueue,
-    toggleQueueStatus
- }
+    toggleQueueStatus,
+    activateQueue,
+    swapToNextTicket
+}
