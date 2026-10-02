@@ -5,14 +5,14 @@ const AppError = require('../utils/appError.js');
 const getAllTicketsInQueue= async (queueId,limit = 10, page = 1)=>{
     const skip = (page - 1) * limit;
     const tickets = await Ticket.find({queue:queueId},{'__v':false}).limit(limit).skip(skip);
-    if(!ticket){
+    if(!tickets){
         throw new AppError('no tickets found or queue id is not exist',404,'fail');
     }
     return tickets;
 }
 
-const createTicket = async (currentUserId,queueId,status = 'waiting') =>{
-    const queue = await Queue.find({_id:queueId,status:'open'},{'__v':false});
+const createTicket = async (currentUserId,queueId,status) =>{
+    const queue = await Queue.findOne({_id:queueId,status:'open'},{'__v':false});
     if(!queue){
         throw new AppError('cannot find queue or it has been closed!',404,'fail');
     }
@@ -28,7 +28,7 @@ const createTicket = async (currentUserId,queueId,status = 'waiting') =>{
     return newTicket;
 }
 
-const createQueue = async (name,createdBy,capacity,status='available')=>{
+const createQueue = async (name,createdBy,capacity,status)=>{
     const queueData = {
         name,
         createdBy,
@@ -40,8 +40,8 @@ const createQueue = async (name,createdBy,capacity,status='available')=>{
     return newQueue;
 }
 
-const updateQueue = async (queueId, data)=>{
-    const queue = await Queue.findById(queueId,{'__v':false});
+const updateQueue = async (queueId, userId, data)=>{
+    const queue = await Queue.findOne({_id:queueId,createdBy:userId},{'__v':false});
     if(!queue){
         throw new AppError('no queue found!',404,'fail');
     }
@@ -56,8 +56,8 @@ const updateQueue = async (queueId, data)=>{
     return updatedQueue;
 }
 
-const cancelTicket = async (ticketId)=>{//rather than delete
-    const ticket = await Ticket.findById(ticketId);
+const cancelTicket = async (ticketId,userId)=>{//rather than delete
+    const ticket = await Ticket.findOne({_id:ticketId,owner:userId,status:'waiting'});
     if(!ticket){
         throw new AppError('no tickets found',404,'fail');
     }

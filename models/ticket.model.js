@@ -24,7 +24,7 @@ const ticketSchema = mongoose.Schema({
     timestamps: true
 })
 
-ticketSchema.index({ prev: 1 }, { unique: true, sparse: true });
+ticketSchema.index({ prev: 1,queue:1 }, {unique : true,sparse: true });
 
 /**
  * {prev:1} : ترتيب تصاعدي

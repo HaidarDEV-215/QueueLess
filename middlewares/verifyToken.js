@@ -11,6 +11,7 @@ const verifyAuth = (req, res, next) => {
         const decodedToken = jwt.verify(token, process.env.SECURITY_CODE);
         req.currentUser = decodedToken; // request object manibulation
         next();
+        
     } catch (error) {
         return next(error);
     }

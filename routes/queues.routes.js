@@ -20,13 +20,24 @@ router.route('/tickets')
     .post(
         verifyToken.verifyAuth,
         queueControllers.createTicket
+    )
+    .put(
+        verifyToken.verifyAuth,
+        queueControllers.cancelTicket
     );
 
-router.route('/tickets/:queueId')
+router.route('/manager/:queueId')
     .get(
         verifyToken.verifyAuth,
         verifyToken.authorizeQueueManager,
         queueControllers.getAllTicketsInQueue
+    )
+    .put(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueValidator.updateQueueValidator(),
+        validationHandler,
+        queueControllers.updateQueue
     );
 
 module.exports = router;

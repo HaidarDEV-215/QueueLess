@@ -31,7 +31,7 @@ const login = async (email, password) => {
     if (!isCorrectPassword) {
         throw new AppError("email or password is not matched", 400, "fail");
     }
-    const token = await createJWT({id:newUser._id, email, phone: user.phone, role: user.role });
+    const token = await createJWT({id:user._id, email, phone: user.phone, role: user.role });
     return token;
 }
 
