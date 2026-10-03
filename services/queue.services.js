@@ -22,7 +22,6 @@ const getUserTickets = async (userId, limit = 10, page = 1) => {
 }
 
 const getUserTicketInQueue = async (userId, queueId) => {
-    const skip = (page - 1) * limit;
     const tickets = await Ticket.findOne({ owner: userId, queue: queueId }, { '__v': false });
     if (!tickets) {
         throw new AppError('no tickets found', 404, 'fail');
@@ -36,7 +35,7 @@ const createTicket = async (currentUserId, queueId, status) => {
         { // search filters
             _id: queueId,
             status: 'open',
-            $expr: { $lt: ['$currentLength', 'capacity'] }// check condition while search
+            $expr: { $lt: ['$currentLength', '$capacity'] }// check condition while search
         },
         { // updates
             $set: { lastTicket: ticketId },  // update to the new ticketId by using atomic operator $set
@@ -130,12 +129,12 @@ const activateQueue = async (queueId, userId) => {
     while (firstTicket.status === 'canceled') {//skip canceled tickets
         firstTicket = await Ticket.findOneAndUpdate({// atomic operation
             queue: queueId,
-            prev: null,
+            prev: firstTicket._id,
             isCheckedBySystem: false  // to avoid execute this operation more than to times to avoid crashes
         }, {
             $set: { isCheckedBySystem: true }
         });
-        if (!firstTicket) {//if last ticket is canceled do not loop more and throw error
+        if (!firstTicket) {//if last ticket is canceled do not lop more and throw error
             throw new AppError('no more tickets queue is finished', 404, 'fail');
         }
     }
@@ -153,7 +152,8 @@ const activateQueue = async (queueId, userId) => {
         }
     );
     if (!activeQueue) {
-        throw new AppError('no queue found!', 404, 'fail');
+        await Ticket.findByIdAndUpdate(firstTicket._id, { isCheckedBySystem: false });
+        throw new AppError('queue not found or already activated', 400, 'fail');
     }
     await Ticket.findByIdAndUpdate(firstTicket._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
     return activeQueue;
@@ -185,7 +185,7 @@ const swapToNextTicket = async (queueId, userId) => {
     }
     while (nextTicketServing.status === 'canceled') {//skip canceled tickets
         nextTicketServing = await Ticket.findOneAndUpdate({
-            prev: queue.currentTurn,
+            prev: nextTicketServing._id,
             isCheckedBySystem: false
         }, {
             $set: { isCheckedBySystem: true }
