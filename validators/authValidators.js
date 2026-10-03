@@ -13,7 +13,7 @@ const registerValidation = () => {
             .isLength({min:2,max:20})
             .withMessage('last name must be 2 to 20 characters')
             .notEmpty()
-            .withMessage("last name cannot be empty"),
+            .withMessage("last name cannot be empty")
         , body('email')
             .isString()
             .notEmpty()

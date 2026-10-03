@@ -6,7 +6,13 @@ const notFoundError = (req, res, next) => {
 }
 
 const globalErrorHaindler = (error, req, res, next) => {
-    res.status(error.statusCode || 500).json({ msg: error.message || 'server error', code: error.statusCode || 500, text: "fail" });
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) console.error(error);
+    res.status(statusCode).json({
+        msg: statusCode >= 500 ? 'internal server error' : error.message,
+        code: statusCode,
+        text: statusCode >= 500 ? 'error' : 'fail'
+    });
 }
 
 module.exports = { notFoundError, globalErrorHaindler };

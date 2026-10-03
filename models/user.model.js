@@ -23,11 +23,11 @@ const userModel = mongoose.Schema({
     },
     password: {
         type: String,
-        require: true
+        required: true
     },
     phone: {
         type: String,
-        require: true
+        required: true
     }
 }, {
     timestamps: true

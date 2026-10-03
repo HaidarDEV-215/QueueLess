@@ -15,12 +15,6 @@ const updateUserData = () => {
         , body('phone')
             .optional()
             .isString()
-        , body('role')
-            .optional()
-            .isString()
-            .isIn(['normalUser', 'queueManager'])
-            .withMessage('role must be one of those items : [normalUser, queueManager ]')
-
     ]
 }
 

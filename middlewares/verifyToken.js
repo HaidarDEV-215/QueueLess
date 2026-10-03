@@ -20,7 +20,7 @@ const verifyAuth = (req, res, next) => {
 const authorizeQueueManager = (req,res,next)=>{
     try{
         if(req.currentUser.role !== 'queueManager'){
-            throw new AppError('Unauthorized! only manager access',401,'fail');
+            throw new AppError('Unauthorized! only manager access',403,'fail');
         }
         next();
     }catch(error){
@@ -31,7 +31,7 @@ const authorizeQueueManager = (req,res,next)=>{
 const authorizeAdmin = (req,res,next)=>{
     try{
         if(req.currentUser.role !== 'admin'){
-            throw new AppError('Unauthorized! only admin access',401,'fail');
+            throw new AppError('Unauthorized! only admin access',403,'fail');
         }
         next();
     }catch(error){

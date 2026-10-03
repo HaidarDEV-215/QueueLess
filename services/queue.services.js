@@ -1,5 +1,6 @@
 const Queue = require('../models/queue.model.js');
 const Ticket = require('../models/ticket.model.js');
+const mongoose = require('mongoose');
 const AppError = require('../utils/appError.js');
 
 const getAllTicketsInQueue = async (queueId, limit = 10, page = 1) => {
@@ -20,9 +21,9 @@ const getUserTickets = async (userId, limit = 10, page = 1) => {
     return tickets;
 }
 
-const getUserTicketInQueue = async (userId, queueId, limit = 10, page = 1) => {
+const getUserTicketInQueue = async (userId, queueId) => {
     const skip = (page - 1) * limit;
-    const tickets = await Ticket.findOne({ owner: userId, queue: queueId }, { '__v': false }).limit(limit).skip(skip);
+    const tickets = await Ticket.findOne({ owner: userId, queue: queueId }, { '__v': false });
     if (!tickets) {
         throw new AppError('no tickets found', 404, 'fail');
     }
@@ -30,22 +31,28 @@ const getUserTicketInQueue = async (userId, queueId, limit = 10, page = 1) => {
 }
 
 const createTicket = async (currentUserId, queueId, status) => {
-    const queue = await Queue.findOne({ _id: queueId, status: 'open' }, { '__v': false });
-    if (!queue) {
-        throw new AppError('cannot find queue or it has been closed!', 404, 'fail');
+    const ticketId = new mongoose.Types.ObjectId();// early id generation
+    const queueUpdateAndReturnOld = await Queue.findOneAndUpdate( // make whole operations in one (atomisity)
+        { // search filters
+            _id: queueId,
+            status: 'open',
+            $expr:{$lt:['$currentLength','capacity']}// check condition while search
+        },
+        { // updates
+            $set:{lastTicket:ticketId},// update to the new ticketId by using atomic operator $set
+            $inc:{currentLength:1}   // add 1 to the queue length by using atomic operator $inc
+        }
+    );// end of atomic query
+    if (!queueUpdateAndReturnOld) {
+        throw new AppError('cannot find queue or it\'s maybe closed or full!', 400, 'fail');
     }
-    if(queue.currentLength>=queue.capacity){
-        throw new AppError('queue is full', 400, 'fail');
-    }
-    const ticketData = {
+    const newTicket = await Ticket.create({
+        _id:ticketId,// when you generate an id manually then mongoDB will not generate one.
         owner: currentUserId,
         queue: queueId,
-        prev: queue.lastTicket,
+        prev: queueUpdateAndReturnOld.lastTicket,
         status
-    }
-    const newTicket = new Ticket(ticketData);
-    await newTicket.save();
-    await Queue.findByIdAndUpdate(queueId, { lastTicket: newTicket._id ,$inc:{currentLength:1}});
+    });
     return newTicket;
 }
 
