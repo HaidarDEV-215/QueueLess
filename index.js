@@ -20,7 +20,7 @@ app.use('/api/auth',require('./routes/auth.routes.js'));
 app.use('/api/queues',require('./routes/queues.routes.js'));
 app.use('/api/accounts',require('./routes/users.routes.js'));
 app.use('/api/admin',require('./routes/admin.routes.js'));
-app.use('/api/manager',require('./routes/users.routes.js'));
+app.use('/api/manager',require('./routes/manager.routes.js'));
 
 
 //error handlers
