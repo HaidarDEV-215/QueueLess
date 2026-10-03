@@ -11,8 +11,6 @@ const getAllUsers = async (limit = 10, page = 1) => {
 }
 
 const updateUser = async (userId, data) => {
-    console.log("update sevice");
-    
     const user = await User.findById(userId);
     if (!user) {
         throw new AppError('no users found', 404, 'fail');
@@ -28,6 +26,15 @@ const updateUser = async (userId, data) => {
     return updatedUser;
 }
 
+const changeUserRole = async (userId,newRole)=>{
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new AppError('no users found', 404, 'fail');
+    }
+    const updatedUser = await User.findByIdAndUpdate(userId,{role : newRole}, { runValidators: true, returnDocument: 'after'});
+    return updatedUser;
+}
+
 const deleteUser = async (userId) => {
     const deletedUser = await User.findByIdAndDelete(userId, { 'password': false, '__v': false });
     if (!deletedUser) {
@@ -39,5 +46,6 @@ const deleteUser = async (userId) => {
 module.exports = {
     getAllUsers,
     updateUser,
-    deleteUser
+    deleteUser,
+    changeUserRole
 }

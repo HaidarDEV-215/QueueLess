@@ -16,6 +16,13 @@ router.route('/')
         adminControllers.deleteUser
     )
 
+router.route('/permissions')
+    .put(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeAdmin,
+        adminControllers.changeUserRole
+    )
+
 
 
 module.exports = router;

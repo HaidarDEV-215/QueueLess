@@ -15,7 +15,15 @@ const deleteUser = asyncWrapper(async (req,res,next)=>{
     res.status(200).json({message:'user deleted successfully',data:null});
 });
 
+const changeUserRole = asyncWrapper(async (req,res,next)=>{
+    const userId = req.body.userId;
+    const newRole = req.body.newRole;
+    const user = await userServices.changeUserRole(userId,newRole);
+    res.status(200).json({message:'role changed',data:user});
+});
+
 module.exports = {
     getAllUsers,
-    deleteUser
+    deleteUser,
+    changeUserRole
 }
