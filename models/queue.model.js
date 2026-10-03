@@ -14,6 +14,10 @@ const queueSchema = mongoose.Schema({
         type: Number,
         required: true
     },
+    currentLength: {
+        type: Number,
+        default: 0
+    },
     lastTicket: {
         type: mongoose.Schema.ObjectId,
         ref: 'Ticket',
