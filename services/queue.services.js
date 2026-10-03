@@ -36,18 +36,18 @@ const createTicket = async (currentUserId, queueId, status) => {
         { // search filters
             _id: queueId,
             status: 'open',
-            $expr:{$lt:['$currentLength','capacity']}// check condition while search
+            $expr: { $lt: ['$currentLength', 'capacity'] }// check condition while search
         },
         { // updates
-            $set:{lastTicket:ticketId},// update to the new ticketId by using atomic operator $set
-            $inc:{currentLength:1}   // add 1 to the queue length by using atomic operator $inc
+            $set: { lastTicket: ticketId },  // update to the new ticketId by using atomic operator $set
+            $inc: { currentLength: 1 }       // add 1 to the queue length by using atomic operator $inc
         }
     );// end of atomic query
     if (!queueUpdateAndReturnOld) {
         throw new AppError('cannot find queue or it\'s maybe closed or full!', 400, 'fail');
     }
     const newTicket = await Ticket.create({
-        _id:ticketId,// when you generate an id manually then mongoDB will not generate one.
+        _id: ticketId,  // when you generate an id manually then mongoDB will not generate one.
         owner: currentUserId,
         queue: queueId,
         prev: queueUpdateAndReturnOld.lastTicket,
@@ -85,16 +85,22 @@ const updateQueue = async (queueId, userId, data) => {
 }
 
 const cancelTicket = async (ticketId, userId) => {//rather than delete
-    const ticket = await Ticket.findOne({ _id: ticketId, owner: userId, status: 'waiting' });
+    const ticket = await Ticket.findOneAndUpdate({// atomic operation
+        _id: ticketId,
+        owner: userId,
+        status: 'waiting'
+    }, {
+        $set: { status: 'canceled' }// cancel ticket when it found 
+        //to avoid execute this operation two times or more for the same ticket befor update it
+    });
     if (!ticket) {
-        throw new AppError('no tickets found', 404, 'fail');
+        throw new AppError('no tickets found or it was canceled', 400, 'fail');
     }
-    const queue = await Queue.findByIdAndUpdate(ticket.queue,{$inc:{currentLength:-1}});
+    const queue = await Queue.findByIdAndUpdate(ticket.queue, { $inc: { currentLength: -1 } });
     if (!queue) {
         throw new AppError('no queue found!', 404, 'fail');
     }
-    const canceledTicket = await Ticket.findByIdAndUpdate(ticketId, { status: 'canceled' }, { returnDocument: 'after', runValidators: true });
-    return canceledTicket;
+    return ticket;
 }
 
 const toggleQueueStatus = async (queueId, userId) => {
@@ -111,22 +117,45 @@ const toggleQueueStatus = async (queueId, userId) => {
 }
 
 const activateQueue = async (queueId, userId) => {
-    const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
-    if (!queue) {
-        throw new AppError('no queue found!', 404, 'fail');
-    }
-    let firstTicket = await Ticket.findOne({ queue: queueId, prev: null });
+    let firstTicket = await Ticket.findOneAndUpdate({// atomic operation
+        queue: queueId,
+        prev: null,
+        isCheckedBySystem: false  // to avoid execute this operation more than to times to avoid crashes
+    }, {
+        $set: { isCheckedBySystem: true }
+    });
     if (!firstTicket) {
-        throw new AppError('no ticket found!', 404, 'fail');
+        throw new AppError('cannot active this queue it may be was activated or it\'s empty', 400, 'fail');
     }
     while (firstTicket.status === 'canceled') {//skip canceled tickets
-        firstTicket = await Ticket.findOne({ queue: queueId, prev: firstTicket._id });
+        firstTicket = await Ticket.findOneAndUpdate({// atomic operation
+            queue: queueId,
+            prev: null,
+            isCheckedBySystem: false  // to avoid execute this operation more than to times to avoid crashes
+        }, {
+            $set: { isCheckedBySystem: true }
+        });
         if (!firstTicket) {//if last ticket is canceled do not loop more and throw error
             throw new AppError('no more tickets queue is finished', 404, 'fail');
         }
     }
-    const servingTicket = await Ticket.findByIdAndUpdate(firstTicket._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
-    const activeQueue = await Queue.findByIdAndUpdate(queueId, { currentTurn: servingTicket._id,$inc:{currentLength:-1} }, { runValidators: true, returnDocument: 'after' });
+    const activeQueue = await Queue.findOneAndUpdate( //atomic operation
+        {
+            _id: queueId,
+            createdBy: userId,
+            currentTurn: null
+        },
+        {
+            $set: { currentTurn: firstTicket._id } //to update current turn onr time only
+        },
+        {
+            returnDocument: 'after'
+        }
+    );
+    if (!activeQueue) {
+        throw new AppError('no queue found!', 404, 'fail');
+    }
+    await Ticket.findByIdAndUpdate(firstTicket._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
     return activeQueue;
 }
 
@@ -135,20 +164,38 @@ const swapToNextTicket = async (queueId, userId) => {
     if (!queue) {
         throw new AppError('no queue found!', 404, 'fail');
     }
-    const oldOne = await Ticket.findByIdAndUpdate(queue.currentTurn, { status: 'finished' }, { runValidators: true, returnDocument: 'after' });
+    await Ticket.findOneAndUpdate({
+        _id: queue.currentTurn,
+        status: 'serving',
+    },
+        {
+            $set: { status: 'finished' },
+        },
+        { returnDocument: 'after' }
+    );
 
-    let nextTicketServing = await Ticket.findOne({ prev: queue.currentTurn });
+    let nextTicketServing = await Ticket.findOneAndUpdate({
+        prev: queue.currentTurn,
+        isCheckedBySystem: false
+    }, {
+        $set: { isCheckedBySystem: true }
+    });
     if (!nextTicketServing) {
         throw new AppError('no more tickets queue is finished', 404, 'fail');
     }
     while (nextTicketServing.status === 'canceled') {//skip canceled tickets
-        nextTicketServing = await Ticket.findOne({ queue: queueId, prev: nextTicketServing._id });
+        nextTicketServing = await Ticket.findOneAndUpdate({
+            prev: queue.currentTurn,
+            isCheckedBySystem: false
+        }, {
+            $set: { isCheckedBySystem: true }
+        });
         if (!nextTicketServing) {//if last ticket is canceled do not loop more and throw error
             throw new AppError('no more tickets queue is finished', 404, 'fail');
         }
     }
-    const updatedTicket = await Ticket.findByIdAndUpdate(nextTicketServing._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
-    const updatedQueue = await Queue.findByIdAndUpdate(queueId, { currentTurn: nextTicketServing._id,$inc:{currentLength:-1} }, { runValidators: true, returnDocument: 'after' });
+    await Ticket.findByIdAndUpdate(nextTicketServing._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
+    const updatedQueue = await Queue.findByIdAndUpdate(queueId, { currentTurn: nextTicketServing._id, $inc: { currentLength: -1 } }, { runValidators: true, returnDocument: 'after' });
     return updatedQueue;
 }
 

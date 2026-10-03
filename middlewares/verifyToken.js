@@ -5,7 +5,7 @@ const verifyAuth = (req, res, next) => {
     const authHeader = req.headers['authorization']
     try {
         if (!authHeader) {
-            throw new AppError("token is required", 401, 'fail');
+            throw new AppError("Unauthorized! token is required", 401, 'fail');
         }
         const token = authHeader.split(' ')[1];
         const decodedToken = jwt.verify(token, process.env.SECURITY_CODE);
@@ -20,7 +20,7 @@ const verifyAuth = (req, res, next) => {
 const authorizeQueueManager = (req,res,next)=>{
     try{
         if(req.currentUser.role !== 'queueManager'){
-            throw new AppError('Unauthorized! only manager access',403,'fail');
+            throw new AppError('Forbidden! only manager access',403,'fail');
         }
         next();
     }catch(error){
@@ -31,7 +31,7 @@ const authorizeQueueManager = (req,res,next)=>{
 const authorizeAdmin = (req,res,next)=>{
     try{
         if(req.currentUser.role !== 'admin'){
-            throw new AppError('Unauthorized! only admin access',403,'fail');
+            throw new AppError('Forbidden! only admin access',403,'fail');
         }
         next();
     }catch(error){
