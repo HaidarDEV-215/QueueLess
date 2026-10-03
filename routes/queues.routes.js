@@ -7,15 +7,6 @@ const validationHandler = require('../middlewares/validationHandler.js');
 const router = express.Router();
 
 
-router.route('/')
-    .post(
-        verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueValidator.createQueueValidator(),
-        validationHandler,
-        queueControllers.createQueue
-    );
-
 router.route('/tickets')
     .post(
         verifyToken.verifyAuth,
@@ -24,37 +15,19 @@ router.route('/tickets')
     .put(
         verifyToken.verifyAuth,
         queueControllers.cancelTicket
-    );
-
-router.route('/manager/:queueId')
+    )
     .get(
         verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueControllers.getAllTicketsInQueue
-    )
-    .put(
-        verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueValidator.updateQueueValidator(),
-        validationHandler,
-        queueControllers.updateQueue
-    )
-    .patch(
-        verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueControllers.toggleQueueStatus
-    )
+        queueControllers.getUserTickets
+    );
 
-router.route('/manager/activate/:queueId')
-    .put(
+router.route('/tickets/:queueId')
+    .get(
         verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueControllers.swapToNextTicket
-    )
-    .post(
-        verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
-        queueControllers.activateQueue
-    )
+        queueControllers.getUserTicketInQueue
+    );
+    
+
+
 
 module.exports = router;

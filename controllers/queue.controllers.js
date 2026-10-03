@@ -1,6 +1,32 @@
 const queueServices = require('../services/queue.services.js');
 const asyncWrapper = require('../middlewares/asyncWrapper.js');
 
+const getUserTickets = asyncWrapper(async (req, res, next) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const userId = req.currentUser.id;
+    const tickets = await queueServices.getUserTickets(userId, limit, page);
+    res.status(200).json({ items: tickets.length, data: tickets });
+});
+
+const getActiveTickets = asyncWrapper(async (req, res, next) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const userId = req.currentUser.id;
+    const queueId = req.params.queueId;
+    const tickets = await queueServices.getUserTickets(userId, limit, page);
+    res.status(200).json({ items: tickets.length, data: tickets });
+
+});
+
+const getUserTicketInQueue = asyncWrapper(async (req, res, next) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const userId = req.currentUser.id;
+    const queueId = req.params.queueId;
+    const tickets = await queueServices.getUserTicketInQueue(userId, queueId, limit, page);
+    res.status(200).json({ items: tickets.length, data: tickets });
+});
 
 const getAllTicketsInQueue = asyncWrapper(async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
@@ -51,10 +77,10 @@ const activateQueue = asyncWrapper(async (req, res, next) => {
     res.status(200).json({ message: 'queue has been activated', data: activeQueue });
 });
 
-const swapToNextTicket = asyncWrapper(async (req,res,next)=>{
+const swapToNextTicket = asyncWrapper(async (req, res, next) => {
     const queueId = req.params.queueId;
     const userId = req.currentUser.id;
-    const newQueueStatus = await queueServices.swapToNextTicket(queueId,userId);
+    const newQueueStatus = await queueServices.swapToNextTicket(queueId, userId);
     res.status(200).json({ message: 'swapped to next ticket', data: newQueueStatus });
 });
 
@@ -66,5 +92,7 @@ module.exports = {
     updateQueue,
     toggleQueueStatus,
     activateQueue,
-    swapToNextTicket
+    swapToNextTicket,
+    getUserTickets,
+    getUserTicketInQueue
 }

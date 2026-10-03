@@ -11,6 +11,24 @@ const getAllTicketsInQueue = async (queueId, limit = 10, page = 1) => {
     return tickets;
 }
 
+const getUserTickets = async (userId, limit = 10, page = 1) => {
+    const skip = (page - 1) * limit;
+    const tickets = await Ticket.find({ owner: userId }, { '__v': false }).limit(limit).skip(skip);
+    if (!tickets) {
+        throw new AppError('no tickets found', 404, 'fail');
+    }
+    return tickets;
+}
+
+const getUserTicketInQueue = async (userId, queueId, limit = 10, page = 1) => {
+    const skip = (page - 1) * limit;
+    const tickets = await Ticket.findOne({ owner: userId, queue: queueId }, { '__v': false }).limit(limit).skip(skip);
+    if (!tickets) {
+        throw new AppError('no tickets found', 404, 'fail');
+    }
+    return tickets;
+}
+
 const createTicket = async (currentUserId, queueId, status) => {
     const queue = await Queue.findOne({ _id: queueId, status: 'open' }, { '__v': false });
     if (!queue) {
@@ -128,5 +146,7 @@ module.exports = {
     cancelTicket,
     toggleQueueStatus,
     activateQueue,
-    swapToNextTicket
+    swapToNextTicket,
+    getUserTickets,
+    getUserTicketInQueue
 };

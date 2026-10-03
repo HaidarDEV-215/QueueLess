@@ -28,9 +28,21 @@ const authorizeQueueManager = (req,res,next)=>{
     }
 }
 
+const authorizeAdmin = (req,res,next)=>{
+    try{
+        if(req.currentUser.role !== 'admin'){
+            throw new AppError('Unauthorized! only admin access',401,'fail');
+        }
+        next();
+    }catch(error){
+        return next(error);
+    }
+}
+
 
 
 module.exports = {
     verifyAuth,
-    authorizeQueueManager
+    authorizeQueueManager,
+    authorizeAdmin
 }

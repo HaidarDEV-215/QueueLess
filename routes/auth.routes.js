@@ -1,10 +1,10 @@
 const express = require('express');
 const validationHandler = require('../middlewares/validationHandler.js');
 const authValidators = require('../validators/authValidators.js');
+const authController = require('../controllers/auth.controllers.js');
 
 const router = express.Router();
 
-const authController = require('../controllers/auth.controllers.js');
 
 router.route('/register')
                 .post(
@@ -18,7 +18,5 @@ router.route('/login')
                     validationHandler,
                     authController.login
                 )
-
-
 
 module.exports = router;
