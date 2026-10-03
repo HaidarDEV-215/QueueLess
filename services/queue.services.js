@@ -3,8 +3,12 @@ const Ticket = require('../models/ticket.model.js');
 const mongoose = require('mongoose');
 const AppError = require('../utils/appError.js');
 
-const getAllTicketsInQueue = async (queueId, limit = 10, page = 1) => {
+const getAllTicketsInQueue = async (queueId,currentUserId ,limit = 10, page = 1) => {
     const skip = (page - 1) * limit;
+    const queue = await Queue.findOne({_id:queueId,createdBy:currentUserId});
+    if (!queue) {
+        throw new AppError('no queue found!', 404, 'fail');
+    }
     const tickets = await Ticket.find({ queue: queueId }, { '__v': false }).limit(limit).skip(skip);
     if (!tickets) {
         throw new AppError('no tickets found or queue id is not exist', 404, 'fail');

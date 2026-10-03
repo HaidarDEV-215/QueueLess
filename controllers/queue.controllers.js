@@ -19,6 +19,7 @@ const getUserTicketInQueue = asyncWrapper(async (req, res, next) => {
 const getAllTicketsInQueue = asyncWrapper(async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const page = parseInt(req.query.page) || 1;
+    const currentUserId = req.currentUser.id;
     const tickets = await queueServices.getAllTicketsInQueue(req.params.queueId, limit, page);
     res.status(200).json({ items: tickets.length, data: tickets });
 });
