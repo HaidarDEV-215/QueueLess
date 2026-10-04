@@ -11,7 +11,8 @@ const globalErrorHaindler = (error, req, res, next) => {
     res.status(statusCode).json({
         msg: statusCode >= 500 ? 'internal server error' : error.message,
         code: statusCode,
-        text: statusCode >= 500 ? 'error' : 'fail'
+        text: statusCode >= 500 ? 'error' : 'fail',
+        details: error.details
     });
 }
 
