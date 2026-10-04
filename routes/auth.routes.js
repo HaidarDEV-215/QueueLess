@@ -2,7 +2,7 @@ const express = require('express');
 const validationHandler = require('../middlewares/validationHandler.js');
 const authValidators = require('../validators/authValidators.js');
 const authController = require('../controllers/auth.controllers.js');
-const {verifyPasswordChange} = require('../middlewares/verifyToken.js');
+const { verifyPasswordChange, verifyAccountConfirming } = require('../middlewares/verifyToken.js');
 
 const router = express.Router();
 
@@ -12,6 +12,14 @@ router.route('/register')
         authValidators.registerValidation(),
         validationHandler,
         authController.register)
+
+router.route('/confirmAccount')
+    .put(
+        verifyAccountConfirming,
+        authValidators.confirmAccountValidator(),
+        validationHandler,
+        authController.confirmAccount
+    )
 
 router.route('/login')
     .post(

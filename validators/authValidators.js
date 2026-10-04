@@ -84,10 +84,18 @@ const changePasswordValidator = () => {
     ]
 }
 
+const confirmAccountValidator = () =>{
+ return [
+        body('code')
+            .isString()
+            .notEmpty()
+    ]}
+
 module.exports = {
     registerValidation,
     loginValidation,
     forgetPasswordValidator,
     confirmOTPValidation,
-    changePasswordValidator
+    changePasswordValidator,
+    confirmAccountValidator
 }

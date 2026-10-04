@@ -8,6 +8,14 @@ const register = asyncWrapper(async (req, res) => {
     res.status(201).json({ message: "user account created successfully", data: { token } });
 });
 
+const confirmAccount = asyncWrapper(async (req, res) => {
+    const { id, email } = req.temporaryUser;
+    const code = req.body.code;
+    const token = await authServices.confirmAccount(email, id, code);
+    res.status(200).json({ message: "account confirmed successfully", data: { token } });
+
+})
+
 const login = asyncWrapper(async (req, res) => {
     const { email, password } = req.body;
     const token = await authServices.login(email, password);
@@ -33,4 +41,4 @@ const changePassword = asyncWrapper(async (req, res) => {
     res.status(200).json({ message: 'password changed' });
 })
 
-module.exports = { register, login, forgetPassword, confirmOTP, changePassword }
+module.exports = { register, confirmAccount, login, forgetPassword, confirmOTP, changePassword }

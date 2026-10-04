@@ -28,6 +28,15 @@ const userModel = mongoose.Schema({
     phone: {
         type: String,
         required: true
+    },
+    isConfirmed:{
+        type:Boolean,
+        default:false
+    },
+    pendingExpiresAt: {
+        type: Date,
+        default: Date.now,
+        expires: 600
     }
 }, {
     timestamps: true
