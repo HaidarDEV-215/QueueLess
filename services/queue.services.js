@@ -34,7 +34,7 @@ const getUserTicketInQueue = async (userId, queueId) => {
 }
 
 const createTicket = async (currentUserId, queueId, status) => {
-    const existTicket = await ticket.findOne({user:currentUserId,queue:queueId,status:"waiting"});
+    const existTicket = await ticket.findOne({owner:currentUserId,queue:queueId,status:"waiting"});
     if(existTicket){
         throw new AppError("you already have a pending ticket in this queue",400,'fail');
     }
@@ -61,6 +61,29 @@ const createTicket = async (currentUserId, queueId, status) => {
         status
     });
     return newTicket;
+}
+
+const getTicketCurrentPosition = async (currentUserId, queueId) => {
+    const queue = await Queue.findOne({ _id: queueId });
+    if (!queue) throw new AppError('queue is not found', 404, 'fail');
+
+    const ticket = await Ticket.findOne({ owner: currentUserId, queue: queueId, status: 'waiting' });
+    if (!ticket) throw new AppError('you don\'t have a ticket in this queue or it was finished or canceled', 400, 'fail');
+
+    let ticketIndex = 0;
+    let ticketPointer = queue.currentTurn === null
+        ? await Ticket.findOne({ prev: null, queue: queueId })
+        : await Ticket.findOne({ _id: queue.currentTurn, queue: queueId });
+
+    if (!ticketPointer) throw new AppError('could not determine ticket position', 500, 'fail');
+
+    while (!ticketPointer._id.equals(ticket._id)) {
+        ticketPointer = await Ticket.findOne({ prev: ticketPointer._id, queue: queueId });
+        if (!ticketPointer) throw new AppError('could not determine ticket position', 500, 'fail');
+        if (ticketPointer.status !== 'canceled') ticketIndex += 1;
+    }
+
+    return { positionIndex: ticketIndex, ticket };
 }
 
 const createQueue = async (name, createdBy, capacity, status) => {
@@ -217,5 +240,6 @@ module.exports = {
     activateQueue,
     swapToNextTicket,
     getUserTickets,
-    getUserTicketInQueue
+    getUserTicketInQueue,
+    getTicketCurrentPosition
 };

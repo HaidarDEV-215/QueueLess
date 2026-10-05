@@ -9,18 +9,18 @@ const getUserTickets = asyncWrapper(async (req, res, next) => {
     res.status(200).json({ items: tickets.length, data: tickets });
 });
 
-const getUserTicketInQueue = asyncWrapper(async (req, res, next) => {
-    const userId = req.currentUser.id;
+const getUserTicketInQueue = asyncWrapper(async (req,res,next)=>{
     const queueId = req.params.queueId;
-    const tickets = await queueServices.getUserTicketInQueue(userId, queueId);
-    res.status(200).json({ items: tickets.length, data: tickets });
+    const userId = req.currentUser.id;
+    const ticketData = await queueServices.getTicketCurrentPosition(userId,queueId);
+    res.status(200).json({ message: 'ticket fitched successfully', data: ticketData });
 });
 
 const getAllTicketsInQueue = asyncWrapper(async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const page = parseInt(req.query.page) || 1;
     const currentUserId = req.currentUser.id;
-    const tickets = await queueServices.getAllTicketsInQueue(req.params.queueId, limit, page);
+    const tickets = await queueServices.getAllTicketsInQueue(req.params.queueId,currentUserId, limit, page);
     res.status(200).json({ items: tickets.length, data: tickets });
 });
 
@@ -83,5 +83,6 @@ module.exports = {
     activateQueue,
     swapToNextTicket,
     getUserTickets,
-    getUserTicketInQueue
+    getUserTicketInQueue,
+    getTicketCurrentPosition
 }
