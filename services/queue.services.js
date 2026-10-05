@@ -34,6 +34,10 @@ const getUserTicketInQueue = async (userId, queueId) => {
 }
 
 const createTicket = async (currentUserId, queueId, status) => {
+    const existTicket = await ticket.findOne({user:currentUserId,queue:queueId,status:"waiting"});
+    if(existTicket){
+        throw new AppError("you already have a pending ticket in this queue",400,'fail');
+    }
     const ticketId = new mongoose.Types.ObjectId();// early id generation
     const queueUpdateAndReturnOld = await Queue.findOneAndUpdate( // make whole operations in one (atomisity)
         { // search filters

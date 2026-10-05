@@ -5,7 +5,7 @@ const asyncWrapper = require('../middlewares/asyncWrapper.js');
 const register = asyncWrapper(async (req, res) => {
     const { firstName, lastName, password, email, phone } = req.body;
     const token = await authServices.register(firstName, lastName, password, email, phone);
-    res.status(201).json({ message: "user account created successfully", data: { token } });
+    res.status(201).json({ message: "user account created successfully, but email not confirmed!", data: { token } });
 });
 
 const confirmAccount = asyncWrapper(async (req, res) => {
