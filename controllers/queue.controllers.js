@@ -84,5 +84,4 @@ module.exports = {
     swapToNextTicket,
     getUserTickets,
     getUserTicketInQueue,
-    getTicketCurrentPosition
 }

@@ -1,14 +1,13 @@
 const express = require('express');
 const verifyToken = require('../middlewares/verifyToken.js');
 const queueControllers = require('../controllers/queue.controllers.js');
-const queueValidator = require('../validators/queueValidators.js');
-const validationHandler = require('../middlewares/validationHandler.js');
-
+const rateLimit = require('../middlewares/rateLimits.js');
 const router = express.Router();
 
 
 router.route('/tickets')
     .post(
+        rateLimit.postRequestLimiter,
         verifyToken.verifyAuth,
         queueControllers.createTicket
     )

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoDBConnection = require('./config/mongoDB.js');
+const rateLimit = require('./middlewares/rateLimits.js');
 
 
 const app = express();
@@ -10,6 +11,7 @@ const port = process.env.PORT;
 mongoDBConnection();
 
 //middlewares
+app.use(rateLimit.requestLimiter);
 app.use(cors());
 app.use(helmet());
 app.use(express.json());

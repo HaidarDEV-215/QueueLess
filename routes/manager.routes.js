@@ -3,11 +3,13 @@ const verifyToken = require('../middlewares/verifyToken.js');
 const queueControllers = require('../controllers/queue.controllers.js');
 const queueValidator = require('../validators/queueValidators.js');
 const validationHandler = require('../middlewares/validationHandler.js');
+const rateLimit = require('../middlewares/rateLimits.js');
 
 const router = express.Router();
 
 router.route('/')
     .post(
+        rateLimit.postRequestLimiter,
         verifyToken.verifyAuth,
         verifyToken.authorizeQueueManager,
         queueValidator.createQueueValidator(),
