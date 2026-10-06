@@ -34,7 +34,7 @@ const getUserTicketInQueue = async (userId, queueId) => {
 }
 
 const createTicket = async (currentUserId, queueId, status) => {
-    const existTicket = await ticket.findOne({owner:currentUserId,queue:queueId,status:"waiting"});
+    const existTicket = await Ticket.findOne({owner:currentUserId,queue:queueId,status:"waiting"});
     if(existTicket){
         throw new AppError("you already have a pending ticket in this queue",400,'fail');
     }
@@ -198,10 +198,9 @@ const swapToNextTicket = async (queueId, userId) => {
     await Ticket.findOneAndUpdate({
         _id: queue.currentTurn,
         status: 'serving',
+    },{
+        $set: { status: 'finished' },
     },
-        {
-            $set: { status: 'finished' },
-        },
         { returnDocument: 'after' }
     );
 
@@ -225,8 +224,23 @@ const swapToNextTicket = async (queueId, userId) => {
             throw new AppError('no more tickets queue is finished', 404, 'fail');
         }
     }
-    await Ticket.findByIdAndUpdate(nextTicketServing._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
-    const updatedQueue = await Queue.findByIdAndUpdate(queueId, { currentTurn: nextTicketServing._id, $inc: { currentLength: -1 } }, { runValidators: true, returnDocument: 'after' });
+    await Ticket.findByIdAndUpdate(
+        nextTicketServing._id,
+        {
+            status: 'serving'
+        },{
+            runValidators: true,
+            returnDocument: 'after'
+        });
+    const updatedQueue = await Queue.findByIdAndUpdate(
+        queueId,
+        {
+            currentTurn: nextTicketServing._id,
+            $inc: { currentLength: -1 } 
+        },{
+            runValidators: true,
+            returnDocument: 'after'
+        });
     return updatedQueue;
 }
 

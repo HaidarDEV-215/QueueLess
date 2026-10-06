@@ -15,7 +15,8 @@ const verifyAuth = (req, res, next) => {
         req.currentUser = decodedToken; // request object manibulation
         next();
 
-    } catch (error) {
+    } catch (err) {
+        const error = new AppError(err.message, err.statusCode || 401, 'fail');
         return next(error);
     }
 }
@@ -33,7 +34,8 @@ const verifyAccountConfirming = (req, res, next) => {
         }
         req.temporaryUser = decodedToken
         next();
-    } catch (error) {
+    } catch (err) {
+        const error = new AppError(err.message, err.statusCode || 401, 'fail');
         return next(error);
     }
 
@@ -54,7 +56,8 @@ const verifyPasswordChange = (req, res, next) => {
         }
         req.temporaryUser = decodedToken
         next();
-    } catch (error) {
+    }catch (err) {
+        const error = new AppError(err.message, err.statusCode || 401, 'fail');
         return next(error);
     }
 
@@ -66,7 +69,8 @@ const authorizeQueueManager = (req, res, next) => {
             throw new AppError('Forbidden! only manager access', 403, 'fail');
         }
         next();
-    } catch (error) {
+    }catch (err) {
+        const error = new AppError(err.message, err.statusCode || 401, 'fail');
         return next(error);
     }
 }
@@ -77,7 +81,8 @@ const authorizeAdmin = (req, res, next) => {
             throw new AppError('Forbidden! only admin access', 403, 'fail');
         }
         next();
-    } catch (error) {
+    }catch (err) {
+        const error = new AppError(err.message, err.statusCode || 401, 'fail');
         return next(error);
     }
 }
