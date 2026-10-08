@@ -23,7 +23,10 @@ const register = async (firstName, lastName, password, email, phone) => {
     });
     await Otp.deleteMany({ email: newUser.email });
     const otpCode = await crypto.randomInt(100000, 999999);
-    const sendingEmail = await emailService(email, 'account verification', emailTemplates.emailVerificationTemplate(otpCode))
+    const sendingEmail = await emailService(
+        email, 
+        'account verification', 
+        emailTemplates.emailVerificationTemplate(`${firstName} ${lastName}`,otpCode))
         .catch((error) => {
             console.error(error);
         });
@@ -114,7 +117,10 @@ const forgetPassword = async (email) => {
     }
     await Otp.deleteMany({ email: existUser.email });
     const otpCode = await crypto.randomInt(100000, 999999);
-    const sendingEmail = await emailService(email, 'account verification', emailTemplates.emailVerificationTemplate(otpCode))
+    const sendingEmail = await emailService(
+        email,
+        'account verification', 
+        emailTemplates.emailVerificationTemplate(`${firstName} ${lastName}`,otpCode))
         .catch((error) => {
             console.error(error);
         });

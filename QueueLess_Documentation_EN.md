@@ -585,7 +585,7 @@ The project does not require a frontend to run.
 After obtaining the project:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/HaidarDEV-215/QueueLess.git
 cd QueueLess
 ```
 
