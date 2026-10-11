@@ -1,5 +1,6 @@
 const Queue = require('../models/queue.model.js');
 const Ticket = require('../models/ticket.model.js');
+const emailSender = require('../utils/sendEmail.js');
 const mongoose = require('mongoose');
 const AppError = require('../utils/appError.js');
 
@@ -33,8 +34,9 @@ const getUserTicketInQueue = async (userId, queueId) => {
     return tickets;
 }
 
-const createTicket = async (currentUserId, queueId, status) => {
-    const existTicket = await Ticket.findOne({owner:currentUserId,queue:queueId,status:"waiting"});
+const createTicket = async (userData, queueId, status) => {
+    const {id,firstName,lastName, email} = userData;
+    const existTicket = await Ticket.findOne({owner:id,queue:queueId,status:"waiting"});
     if(existTicket){
         throw new AppError("you already have a pending ticket in this queue",400,'fail');
     }
@@ -55,7 +57,10 @@ const createTicket = async (currentUserId, queueId, status) => {
     }
     const newTicket = await Ticket.create({
         _id: ticketId,  // when you generate an id manually then mongoDB will not generate one.
-        owner: currentUserId,
+        owner: id,
+        firstName,
+        lastName,
+        email,
         queue: queueId,
         prev: queueUpdateAndReturnOld.lastTicket,
         status
@@ -146,7 +151,8 @@ const toggleQueueStatus = async (queueId, userId) => {
     return updatedQueue;
 }
 
-const activateQueue = async (queueId, userId) => {
+const activateQueue = async (queueId, userData) => {
+    const userId = userData.id;
     let firstTicket = await Ticket.findOneAndUpdate({// atomic operation
         queue: queueId,
         prev: null,
@@ -157,6 +163,7 @@ const activateQueue = async (queueId, userId) => {
     if (!firstTicket) {
         throw new AppError('cannot active this queue it may be was activated or it\'s empty', 400, 'fail');
     }
+    const {firstName, lastName, email} = firstTicket;
     while (firstTicket.status === 'canceled') {//skip canceled tickets
         firstTicket = await Ticket.findOneAndUpdate({// atomic operation
             queue: queueId,
@@ -186,11 +193,13 @@ const activateQueue = async (queueId, userId) => {
         await Ticket.findByIdAndUpdate(firstTicket._id, { isCheckedBySystem: false });
         throw new AppError('queue not found or already activated', 400, 'fail');
     }
+    await emailSender('your-turn',{userName:`${firstName} ${lastName}`, email});
     await Ticket.findByIdAndUpdate(firstTicket._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
     return activeQueue;
 }
 
-const swapToNextTicket = async (queueId, userId) => {
+const swapToNextTicket = async (queueId, userData) => {
+    const userId = userData.id;
     const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
     if (!queue) {
         throw new AppError('no queue found!', 404, 'fail');
@@ -224,6 +233,7 @@ const swapToNextTicket = async (queueId, userId) => {
             throw new AppError('no more tickets queue is finished', 404, 'fail');
         }
     }
+    const {firstName,lastName, email} = nextTicketServing;
     await Ticket.findByIdAndUpdate(
         nextTicketServing._id,
         {
@@ -240,7 +250,11 @@ const swapToNextTicket = async (queueId, userId) => {
         },{
             runValidators: true,
             returnDocument: 'after'
-        });
+        }
+    );
+    await emailSender('your-turn',{userName:`${firstName} ${lastName}`, email});
+
+    await emailSender('',{});
     return updatedQueue;
 }
 

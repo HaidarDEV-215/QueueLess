@@ -1,7 +1,7 @@
 const express = require('express');
 const verifyToken = require('../middlewares/verifyToken.js');
 const queueControllers = require('../controllers/queue.controllers.js');
-const ticketValidator = require('../validators/ticketValidators.js');
+const ticketValidators = require('../validators/ticketValidators.js');
 const validationHandler = require('../middlewares/validationHandler.js');
 const rateLimit = require('../middlewares/rateLimits.js');
 const router = express.Router();
@@ -10,7 +10,7 @@ const router = express.Router();
 router.route('/tickets')
     .post(
         rateLimit.postRequestLimiter,
-        ticketValidator(),
+        ticketValidators.ticketValidator(),
         validationHandler,
         verifyToken.verifyAuth,
         queueControllers.createTicket

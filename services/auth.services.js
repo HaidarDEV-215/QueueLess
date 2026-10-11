@@ -4,8 +4,7 @@ const bcryptjs = require('bcryptjs');
 const createJWT = require('../utils/createJWT.js');
 const AppError = require('../utils/appError.js');
 const crypto = require('crypto');
-const emailService = require('../utils/emailService.js');
-const emailTemplates = require('../utils/emailsTemplates.js');
+const emailSender = require('../utils/sendEmail.js');
 
 const register = async (firstName, lastName, password, email, phone) => {
     const user = await User.findOne({ email });
@@ -23,18 +22,12 @@ const register = async (firstName, lastName, password, email, phone) => {
     });
     await Otp.deleteMany({ email: newUser.email });
     const otpCode = await crypto.randomInt(100000, 999999);
-    const sendingEmail = await emailService(
-        email, 
-        'account verification', 
-        emailTemplates.emailVerificationTemplate(`${firstName} ${lastName}`,otpCode))
-        .catch((error) => {
-            console.error(error);
-        });
+    const sendingEmail = await emailSender('account-verification',{email,firstName,lastName,otp:otpCode});
     if (!sendingEmail) {
         throw new AppError('cannot send email', 500, 'error');
     }
-    const incodedOtp = await bcryptjs.hash(otpCode.toString(),5);
-    const newOtp = await Otp.create({
+    const incodedOtp = await bcryptjs.hash(otpCode.toString(), 5);
+    await Otp.create({
         user: newUser._id,
         email: email,
         code: incodedOtp,
@@ -42,11 +35,14 @@ const register = async (firstName, lastName, password, email, phone) => {
     })
     const token = await createJWT({
         id: newUser._id,
+        firstName,
+        lastName,
         email,
         phone,
         role: newUser.role,
         purpose: 'confirm_account',
-        isConfirmed: newUser.isConfirmed }
+        isConfirmed: newUser.isConfirmed
+    }
         , "10min");
     return token;
 }
@@ -81,6 +77,8 @@ const confirmAccount = async (email, id, code) => {
     }
     const token = await createJWT({
         id: updatedUserConfirmation._id,
+        firstName: updatedUserConfirmation.firstName,
+        lastName: updatedUserConfirmation.lastName,
         email,
         phone: updatedUserConfirmation.phone,
         role: updatedUserConfirmation.role,
@@ -91,7 +89,7 @@ const confirmAccount = async (email, id, code) => {
 }
 
 const login = async (email, password) => {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email ,isConfirmed:true});
     if (!user) {
         throw new AppError("email or password is not matched", 400, "fail");
     }
@@ -101,6 +99,8 @@ const login = async (email, password) => {
     }
     const token = await createJWT({
         id: user._id,
+        firstName:user.firstName,
+        lastName:user.lastName,
         email,
         phone: user.phone,
         role: user.role,
@@ -117,12 +117,13 @@ const forgetPassword = async (email) => {
     }
     await Otp.deleteMany({ email: existUser.email });
     const otpCode = await crypto.randomInt(100000, 999999);
-    const sendingEmail = await emailService(
-        email,
-        'account verification', 
-        emailTemplates.emailVerificationTemplate(`${firstName} ${lastName}`,otpCode))
-        .catch((error) => {
-            console.error(error);
+    const sendingEmail = await emailSender(
+        'account-verification',
+        {
+            email,
+            firstName:existUser.firstName,
+            lastName:existUser.lastName,
+            otp:otpCode
         });
     if (!sendingEmail) {
         throw new AppError('cannot send email', 500, 'error');
