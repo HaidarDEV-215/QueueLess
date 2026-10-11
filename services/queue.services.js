@@ -1,12 +1,40 @@
 const Queue = require('../models/queue.model.js');
 const Ticket = require('../models/ticket.model.js');
+const User = require('../models/user.model.js');
 const emailSender = require('../utils/sendEmail.js');
 const mongoose = require('mongoose');
 const AppError = require('../utils/appError.js');
 
-const getAllTicketsInQueue = async (queueId,currentUserId ,limit = 10, page = 1) => {
+// data-access helpers
+
+const getNextWaitingTicket = async (filters) => {
+    let waitingTicket = await Ticket.findOne({
+        ...filters,
+    });
+    while (waitingTicket && waitingTicket.status === 'canceled') {//skip canceled tickets
+        waitingTicket = await Ticket.findOne({
+            queue: waitingTicket.queue,
+            prev: waitingTicket._id,
+        });
+    }
+    return waitingTicket;
+}
+
+const notifyTurnChange = async (currentServingTicket) => {
+    const user = await User.findById(currentServingTicket.owner).select('firstName lastName email').lean();
+    emailSender('your-turn', { userName: `${user.firstName} ${user.lastName}`, email: user.email });
+    const willBeNextTicket = await getNextWaitingTicket({ prev: currentServingTicket._id });
+    if (willBeNextTicket !== null) {
+        const nextUser = await User.findById(willBeNextTicket.owner).select('firstName lastName email').lean();
+        emailSender('next-turn', { userName: `${nextUser.firstName} ${nextUser.lastName}`, email: nextUser.email });
+    }
+}
+
+
+// real services
+const getAllTicketsInQueue = async (queueId, currentUserId, limit = 10, page = 1) => {
     const skip = (page - 1) * limit;
-    const queue = await Queue.findOne({_id:queueId,createdBy:currentUserId});
+    const queue = await Queue.findOne({ _id: queueId, createdBy: currentUserId });
     if (!queue) {
         throw new AppError('no queue found!', 404, 'fail');
     }
@@ -34,11 +62,10 @@ const getUserTicketInQueue = async (userId, queueId) => {
     return tickets;
 }
 
-const createTicket = async (userData, queueId, status) => {
-    const {id,firstName,lastName, email} = userData;
-    const existTicket = await Ticket.findOne({owner:id,queue:queueId,status:"waiting"});
-    if(existTicket){
-        throw new AppError("you already have a pending ticket in this queue",400,'fail');
+const createTicket = async (id, queueId) => {
+    const existTicket = await Ticket.findOne({ owner: id, queue: queueId, status: "waiting" });
+    if (existTicket) {
+        throw new AppError("you already have a pending ticket in this queue", 400, 'fail');
     }
     const ticketId = new mongoose.Types.ObjectId();// early id generation
     const queueUpdateAndReturnOld = await Queue.findOneAndUpdate( // make whole operations in one (atomisity)
@@ -58,12 +85,9 @@ const createTicket = async (userData, queueId, status) => {
     const newTicket = await Ticket.create({
         _id: ticketId,  // when you generate an id manually then mongoDB will not generate one.
         owner: id,
-        firstName,
-        lastName,
-        email,
         queue: queueId,
         prev: queueUpdateAndReturnOld.lastTicket,
-        status
+        status:'waiting'
     });
     return newTicket;
 }
@@ -151,30 +175,18 @@ const toggleQueueStatus = async (queueId, userId) => {
     return updatedQueue;
 }
 
-const activateQueue = async (queueId, userData) => {
-    const userId = userData.id;
-    let firstTicket = await Ticket.findOneAndUpdate({// atomic operation
-        queue: queueId,
-        prev: null,
-        isCheckedBySystem: false  // to avoid execute this operation more than to times to avoid crashes
-    }, {
-        $set: { isCheckedBySystem: true }
-    });
-    if (!firstTicket) {
-        throw new AppError('cannot active this queue it may be was activated or it\'s empty', 400, 'fail');
+const activateQueue = async (queueId, userId) => {
+    const queue = await Queue.findOne({ _id: queueId, createdBy: userId, currentTurn: null });
+    if (!queue) {
+        throw new AppError('queue not found or already activated', 400, 'fail');
     }
-    const {firstName, lastName, email} = firstTicket;
-    while (firstTicket.status === 'canceled') {//skip canceled tickets
-        firstTicket = await Ticket.findOneAndUpdate({// atomic operation
-            queue: queueId,
-            prev: firstTicket._id,
-            isCheckedBySystem: false  // to avoid execute this operation more than to times to avoid crashes
-        }, {
-            $set: { isCheckedBySystem: true }
-        });
-        if (!firstTicket) {//if last ticket is canceled do not lop more and throw error
-            throw new AppError('no more tickets queue is finished', 404, 'fail');
-        }
+    const firstTicket = await getNextWaitingTicket({ queue: queueId, prev: null });
+    if (!firstTicket) {
+        throw new AppError('no tickets found', 404, 'fail');
+    }
+    const currentServingTicket = await Ticket.findOneAndUpdate({_id:firstTicket._id, status:'waiting'}, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
+    if(!currentServingTicket){
+        throw new AppError('ticket status changed, try again', 409, 'fail');
     }
     const activeQueue = await Queue.findOneAndUpdate( //atomic operation
         {
@@ -183,78 +195,69 @@ const activateQueue = async (queueId, userData) => {
             currentTurn: null
         },
         {
-            $set: { currentTurn: firstTicket._id } //to update current turn onr time only
+            $set: { currentTurn: firstTicket._id }, //to update current turn onr time only
+            $inc: { currentLength: -1 }
         },
         {
             returnDocument: 'after'
         }
     );
     if (!activeQueue) {
-        await Ticket.findByIdAndUpdate(firstTicket._id, { isCheckedBySystem: false });
         throw new AppError('queue not found or already activated', 400, 'fail');
     }
-    await emailSender('your-turn',{userName:`${firstName} ${lastName}`, email});
-    await Ticket.findByIdAndUpdate(firstTicket._id, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
+    notifyTurnChange(currentServingTicket).catch((error)=>{
+        console.error(error.message);
+    });
     return activeQueue;
 }
 
-const swapToNextTicket = async (queueId, userData) => {
-    const userId = userData.id;
+const swapToNextTicket = async (queueId, userId) => {
     const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
     if (!queue) {
         throw new AppError('no queue found!', 404, 'fail');
     }
+    if (!queue.currentTurn) {
+        throw new AppError('queue is not activated yet!', 400, 'fail');
+    }
     await Ticket.findOneAndUpdate({
         _id: queue.currentTurn,
         status: 'serving',
-    },{
+    }, {
         $set: { status: 'finished' },
     },
         { returnDocument: 'after' }
     );
-
-    let nextTicketServing = await Ticket.findOneAndUpdate({
-        prev: queue.currentTurn,
-        isCheckedBySystem: false
-    }, {
-        $set: { isCheckedBySystem: true }
-    });
+    const nextTicketServing = await getNextWaitingTicket({ prev: queue.currentTurn, queue: queueId });
     if (!nextTicketServing) {
         throw new AppError('no more tickets queue is finished', 404, 'fail');
     }
-    while (nextTicketServing.status === 'canceled') {//skip canceled tickets
-        nextTicketServing = await Ticket.findOneAndUpdate({
-            prev: nextTicketServing._id,
-            isCheckedBySystem: false
-        }, {
-            $set: { isCheckedBySystem: true }
-        });
-        if (!nextTicketServing) {//if last ticket is canceled do not loop more and throw error
-            throw new AppError('no more tickets queue is finished', 404, 'fail');
-        }
-    }
-    const {firstName,lastName, email} = nextTicketServing;
-    await Ticket.findByIdAndUpdate(
-        nextTicketServing._id,
+    const currentServingTicket = await Ticket.findOneAndUpdate(
+        {
+            _id:nextTicketServing._id,
+            status:'waiting'
+        },
         {
             status: 'serving'
-        },{
-            runValidators: true,
-            returnDocument: 'after'
-        });
+        }, {
+        runValidators: true,
+        returnDocument: 'after'
+    });
+    if(!currentServingTicket){
+        throw new AppError('ticket status changed, try again', 409,'fail')
+    }
     const updatedQueue = await Queue.findByIdAndUpdate(
         queueId,
         {
             currentTurn: nextTicketServing._id,
-            $inc: { currentLength: -1 } 
-        },{
-            runValidators: true,
-            returnDocument: 'after'
-        }
+            $inc: { currentLength: -1 }
+        }, {
+        runValidators: true,
+        returnDocument: 'after'
+    }
     );
-    await emailSender('your-turn',{userName:`${firstName} ${lastName}`, email});
-
-    await emailSender('',{});
+    notifyTurnChange(currentServingTicket).catch((error)=>{
+        console.error(error.message);
+    });
     return updatedQueue;
 }
 

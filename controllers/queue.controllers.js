@@ -25,8 +25,7 @@ const getAllTicketsInQueue = asyncWrapper(async (req, res, next) => {
 });
 
 const createTicket = asyncWrapper(async (req, res, next) => {
-    const status = req?.body?.status ?? "waiting";
-    const newTicket = await queueServices.createTicket(req.currentUser.id, req.body.queueId, status);
+    const newTicket = await queueServices.createTicket(req.currentUser.id, req.body.queueId);
     res.status(201).json({ message: 'ticket created successfully', data: newTicket });
 });
 

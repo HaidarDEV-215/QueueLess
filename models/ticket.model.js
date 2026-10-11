@@ -20,10 +20,6 @@ const ticketSchema = mongoose.Schema({
         type: String,
         enum: ['waiting', 'serving', 'canceled', 'finished'],
         default: 'waiting'
-    },
-    isCheckedBySystem:{
-        type:Boolean,
-        default:false
     }
 }, {
     timestamps: true
