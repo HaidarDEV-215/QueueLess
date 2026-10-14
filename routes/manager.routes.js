@@ -40,12 +40,13 @@ router.route('/activate/:queueId')
     .put(
         verifyToken.verifyAuth,
         verifyToken.authorizeQueueManager,
-        queueControllers.swapToNextTicket
-    )
-    .post(
-        verifyToken.verifyAuth,
-        verifyToken.authorizeQueueManager,
         queueControllers.activateQueue
     )
 
+router.route('/swapToNext/:queueId')
+    .put(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueControllers.swapToNextTicket
+    )
 module.exports = router;

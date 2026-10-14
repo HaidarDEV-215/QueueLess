@@ -22,7 +22,14 @@ const register = async (firstName, lastName, password, email, phone) => {
     });
     await Otp.deleteMany({ email: newUser.email });
     const otpCode = await crypto.randomInt(100000, 999999);
-    const sendingEmail = await emailSender('account-verification',{email,firstName,lastName,otp:otpCode});
+    const sendingEmail = await emailSender(
+        'account-verification',
+        {
+            email,
+            userName: `${firstName} ${lastName}`,
+            otp:otpCode
+        }
+    );
     if (!sendingEmail) {
         throw new AppError('cannot send email', 500, 'error');
     }
@@ -121,8 +128,7 @@ const forgetPassword = async (email) => {
         'account-verification',
         {
             email,
-            firstName:existUser.firstName,
-            lastName:existUser.lastName,
+            userName: `${existUser.firstName} ${existUser.lastName}`,
             otp:otpCode
         });
     if (!sendingEmail) {

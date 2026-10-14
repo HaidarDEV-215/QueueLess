@@ -31,7 +31,7 @@ const forgetPassword = asyncWrapper(async (req, res) => {
 const confirmOTP = asyncWrapper(async (req, res) => {
     const { code, email } = req.body;
     const token = await authServices.confirmOTP(code, email);
-    res.status(200).json({ message: 'email verified', data: token });
+    res.status(200).json({ message: 'email verified', data: {token} });
 });
 
 const changePassword = asyncWrapper(async (req, res) => {
