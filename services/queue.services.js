@@ -143,6 +143,16 @@ const updateQueue = async (queueId, userId, data) => {
     return updatedQueue;
 }
 
+const deleteQueueWithRelatedTickets = async (queueId, userId)=>{
+    const deletedQueue = await Queue.findOneAndDelete({_id:queueId,createdBy:userId});
+    if(!deletedQueue){
+        throw new AppError("queue not found", 404, 'fail');
+    }
+    //delete related tickets when queue deleted
+    await Ticket.deleteMany({queue:queueId});
+    return deletedQueue;
+}
+
 const cancelTicket = async (ticketId, userId) => {//rather than delete
     const ticket = await Ticket.findOneAndUpdate({// atomic operation
         _id: ticketId,
@@ -272,5 +282,6 @@ module.exports = {
     swapToNextTicket,
     getUserTickets,
     getUserTicketInQueue,
-    getTicketCurrentPosition
+    getTicketCurrentPosition,
+    deleteQueueWithRelatedTickets
 };

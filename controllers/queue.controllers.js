@@ -72,6 +72,17 @@ const swapToNextTicket = asyncWrapper(async (req, res, next) => {
     res.status(200).json({ message: 'swapped to next ticket', data: newQueueStatus });
 });
 
+const deleteQueueWithRelatedTickets = asyncWrapper(async (req,res,next)=>{
+    const userId = req.currentUser.id;
+    const queueId = req.params.queueId;
+    await queueServices.deleteQueueWithRelatedTickets(queueId,userId);
+    res.status(200).json({ message: "queue deleted successfully with its tickets", data:null });
+});
+
+// todo: tickets migration to another queue with it's order...
+// ATTENTION first ticket must be linked with last ticket in the new queue
+// remember to check capacity and queue status (open or closed) to execute opration
+
 module.exports = {
     getAllTicketsInQueue,
     createTicket,
@@ -83,4 +94,5 @@ module.exports = {
     swapToNextTicket,
     getUserTickets,
     getUserTicketInQueue,
+    deleteQueueWithRelatedTickets
 }

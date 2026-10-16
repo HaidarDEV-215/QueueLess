@@ -35,6 +35,11 @@ router.route('/:queueId')
         verifyToken.authorizeQueueManager,
         queueControllers.toggleQueueStatus
     )
+    .delete(
+        verifyToken.verifyAuth,
+        verifyToken.authorizeQueueManager,
+        queueControllers.deleteQueueWithRelatedTickets
+    )
 
 router.route('/activate/:queueId')
     .put(
