@@ -1,13 +1,17 @@
-const {rateLimit} = require('express-rate-limit');
+const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
+
+const generateKeyById = (req)=>{
+    const ip = ipKeyGenerator(req.ip,56);
+    return `${ip}-${req.baseUrl}-${req.path}`;
+}
 
 const requestLimiter = rateLimit({
     windowMs: 15*60*1000, //15 minutes
     limit: 20, // 20requist for each window (15 min)
     standardHeaders:"draft-8",
     legacyHeaders:false,
-    ipv6Subnet:56,
     skip:(req,res)=>false,
-    keyGenerator:(req)=>`${req.ip}_${req.baseUrl}${req.path}`,
+    keyGenerator:generateKeyById,
     handler:(req,res,next,options)=>{
         res.status(options.statusCode).json({error:"you reach your limit",message:"try again latter",code:options.statusCode})
     }
@@ -18,9 +22,8 @@ const postRequestLimiter = rateLimit({
     limit: 20, // 20requist for each window (15 min)
     standardHeaders:"draft-8",
     legacyHeaders:false,
-    ipv6Subnet:56,
     skip:(req,res)=>false,
-    keyGenerator:(req)=>`${req.ip}_${req.baseUrl}${req.path}`,
+    keyGenerator:generateKeyById,
     handler:(req,res,next,options)=>{
         res.status(options.statusCode).json({error:"you reach your limit",message:"try again latter",code:options.statusCode})
     }
@@ -30,8 +33,7 @@ const baseAuthLimiter = {
     windowMs: 60 * 60 * 1000, // 1 hour
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    ipv6Subnet: 56,
-    keyGenerator:(req)=>`${req.ip}_${req.baseUrl}${req.path}`,
+    keyGenerator:generateKeyById,
     handler: (req, res, next, options) => {
         res.status(options.statusCode).json({
             error: "you reached your limit",
