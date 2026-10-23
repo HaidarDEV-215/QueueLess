@@ -16,6 +16,11 @@ const otpSchema = mongoose.Schema({
         type: String, // because it should be incrypted with bcrypt
         required: true
     },
+    purpose:{
+        type:String,
+        enum:['account-verification','reset-password'],
+        required:true
+    },
     expiresAt: {
         type: Date,
         required: true,

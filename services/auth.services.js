@@ -9,7 +9,10 @@ const emailSender = require('../utils/sendEmail.js');
 const register = async (firstName, lastName, password, email, phone) => {
     const user = await User.findOne({ email });
     if (user) {
-        throw new AppError("user with this email is already exist", 400, "fail");
+        if (user.isConfirmed)
+            throw new AppError("user with this email is already exist", 400, "fail");
+        else
+            throw new AppError("user with this email is already exist but not confirmed", 400, "fail");
     }
     const newUser = await User.create({
         firstName,
@@ -27,7 +30,7 @@ const register = async (firstName, lastName, password, email, phone) => {
         {
             email,
             userName: `${firstName} ${lastName}`,
-            otp:otpCode
+            otp: otpCode
         }
     );
     if (!sendingEmail) {
@@ -38,8 +41,9 @@ const register = async (firstName, lastName, password, email, phone) => {
         user: newUser._id,
         email: email,
         code: incodedOtp,
+        purpose: 'account-verification',
         expiresAt: Date.now() + 1000 * 60 * 10
-    })
+    });
     const token = await createJWT({
         id: newUser._id,
         firstName,
@@ -59,7 +63,14 @@ const confirmAccount = async (email, id, code) => {
     if (!thisUser) {
         throw new AppError("user is not found", 404, "fail");
     }
-    const existOtp = await Otp.findOne({ email, user: thisUser._id })
+    const existOtp = await Otp.findOne({
+        email,
+        user: thisUser._id,
+        purpose: 'account-verification',
+        expiresAt: {
+            $gt: new Date(Date.now())
+        }
+    })
     if (!existOtp) {
         throw new AppError("an error accured!", 400, "fail");
     }
@@ -96,7 +107,7 @@ const confirmAccount = async (email, id, code) => {
 }
 
 const login = async (email, password) => {
-    const user = await User.findOne({ email ,isConfirmed:true});
+    const user = await User.findOne({ email, isConfirmed: true });
     if (!user) {
         throw new AppError("email or password is not matched", 400, "fail");
     }
@@ -106,8 +117,8 @@ const login = async (email, password) => {
     }
     const token = await createJWT({
         id: user._id,
-        firstName:user.firstName,
-        lastName:user.lastName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email,
         phone: user.phone,
         role: user.role,
@@ -129,7 +140,7 @@ const forgetPassword = async (email) => {
         {
             email,
             userName: `${existUser.firstName} ${existUser.lastName}`,
-            otp:otpCode
+            otp: otpCode
         });
     if (!sendingEmail) {
         throw new AppError('cannot send email', 500, 'error');
@@ -139,6 +150,8 @@ const forgetPassword = async (email) => {
     await Otp.create({
         user: existUser._id,
         email: email,
+        purpose: 'reset-password',
+
         code: incodedOtp,
         expiresAt: Date.now() + 1000 * 60 * 5 //expire in five minutes
     });
@@ -146,8 +159,13 @@ const forgetPassword = async (email) => {
 }
 
 const confirmOTP = async (otp, email) => {
-    const existOtp = await Otp.findOne({ email });
-
+    const existOtp = await Otp.findOne({
+        email,
+        purpose: 'reset-password',
+        expiresAt: {
+            $gt: new Date(Date.now())
+        }
+    });
     if (!existOtp) {
         throw new AppError('an error auucred', 400, 'error');
     }
