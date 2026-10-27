@@ -10,6 +10,14 @@ const getAllUsers = async (limit = 10, page = 1) => {
     return users;
 }
 
+const getUserAccountData = async(userId)=>{
+    const user = await User.findById(userId,{'password':false,'__v':false});
+    if(!user){
+        throw new AppError('no users found',404,'fail');
+    }
+    return user;
+}
+
 const updateUser = async (userId, data) => {
     const user = await User.findById(userId);
     if (!user) {
@@ -47,5 +55,6 @@ module.exports = {
     getAllUsers,
     updateUser,
     deleteUser,
-    changeUserRole
+    changeUserRole,
+    getUserAccountData
 }

@@ -51,10 +51,11 @@ const updateQueue = asyncWrapper(async (req, res, next) => {
     res.status(200).json({ message: 'ticket updated', data: updatedTicket });
 });
 
-const toggleQueueStatus = asyncWrapper(async (req, res, next) => {
+const setQueueStatus = asyncWrapper(async (req, res, next) => {
     const queueId = req.params.queueId;
     const userId = req.currentUser.id;
-    const queue = await queueServices.toggleQueueStatus(queueId, userId);
+    const status = req.body.newStatus;
+    const queue = await queueServices.setQueueStatus(queueId, userId, status);
     res.status(200).json({ message: `done.. queue is ${queue.status}`, data: queue });
 });
 
@@ -89,7 +90,7 @@ module.exports = {
     createQueue,
     cancelTicket,
     updateQueue,
-    toggleQueueStatus,
+    setQueueStatus,
     activateQueue,
     swapToNextTicket,
     getUserTickets,

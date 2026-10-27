@@ -8,7 +8,6 @@ const rateLimit = require('./middlewares/rateLimits.js');
 
 const app = express();
 const port = process.env.PORT;
-mongoDBConnection();
 
 //middlewares
 app.use(rateLimit.requestLimiter);
@@ -29,6 +28,16 @@ app.use('/api/manager',require('./routes/manager.routes.js'));
 app.all(/.*/,require('./middlewares/errorHandlers.js').notFoundError);
 app.use(require('./middlewares/errorHandlers.js').globalErrorHaindler);
 
-app.listen(port,()=>{
-    console.log(`listening on port ${port}`);    
-})
+const startServer = async()=>{
+    try{
+        await mongoDBConnection();
+        app.listen(port,()=>{
+            console.log(`listining on port ${port}`);
+        });
+    }catch(error){
+        console.error('failed to start application:\n', error);
+        process.exit(1);
+    }
+}
+
+startServer();

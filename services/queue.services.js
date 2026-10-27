@@ -30,7 +30,6 @@ const notifyTurnChange = async (currentServingTicket) => {
     }
 }
 
-
 // real services
 const getAllTicketsInQueue = async (queueId, currentUserId, limit = 10, page = 1) => {
     const skip = (page - 1) * limit;
@@ -67,29 +66,42 @@ const createTicket = async (id, queueId) => {
     if (existTicket) {
         throw new AppError("you already have a pending ticket in this queue", 400, 'fail');
     }
-    const ticketId = new mongoose.Types.ObjectId();// early id generation
-    const queueUpdateAndReturnOld = await Queue.findOneAndUpdate( // make whole operations in one (atomisity)
-        { // search filters
-            _id: queueId,
-            status: 'open',
-            $expr: { $lt: ['$currentLength', '$capacity'] }// check condition while search
-        },
-        { // updates
-            $set: { lastTicket: ticketId },  // update to the new ticketId by using atomic operator $set
-            $inc: { currentLength: 1 }       // add 1 to the queue length by using atomic operator $inc
-        }
-    );// end of atomic query
-    if (!queueUpdateAndReturnOld) {
-        throw new AppError('cannot find queue or it\'s maybe closed or full!', 400, 'fail');
+    const session = await mongoose.startSession();
+    try {
+        const result = await session.withTransaction(async () => {
+            const ticketId = new mongoose.Types.ObjectId();// early id generation
+            const queueUpdateAndReturnOld = await Queue.findOneAndUpdate( // make whole operations in one (atomisity)
+                { // search filters
+                    _id: queueId,
+                    status: 'open',
+                    $expr: { $lt: ['$currentLength', '$capacity'] }// check condition while search
+                },
+                { // updates
+                    $set: { lastTicket: ticketId },  // update to the new ticketId by using atomic operator $set
+                    $inc: { currentLength: 1 }       // add 1 to the queue length by using atomic operator $inc
+                }
+            ).session(session);// end of atomic query
+            if (!queueUpdateAndReturnOld) {
+                throw new AppError('cannot find queue or it\'s maybe closed or full!', 400, 'fail');
+            }
+            const newTicket = await Ticket.create(
+                [
+                    {
+                        _id: ticketId,  // when you generate an id manually then mongoDB will not generate one.
+                        owner: id,
+                        queue: queueId,
+                        prev: queueUpdateAndReturnOld.lastTicket,
+                        status: 'waiting'
+                    }
+                ],
+                { session }
+            );
+            return newTicket;
+        });
+        return result;
+    } finally {
+        await session.endSession();
     }
-    const newTicket = await Ticket.create({
-        _id: ticketId,  // when you generate an id manually then mongoDB will not generate one.
-        owner: id,
-        queue: queueId,
-        prev: queueUpdateAndReturnOld.lastTicket,
-        status:'waiting'
-    });
-    return newTicket;
 }
 
 const getTicketCurrentPosition = async (currentUserId, queueId) => {
@@ -144,131 +156,181 @@ const updateQueue = async (queueId, userId, data) => {
 }
 
 const deleteQueueWithRelatedTickets = async (queueId, userId)=>{
-    const deletedQueue = await Queue.findOneAndDelete({_id:queueId,createdBy:userId});
-    if(!deletedQueue){
-        throw new AppError("queue not found", 404, 'fail');
+    const session = await mongoose.startSession();
+    try {
+        const result = await session.withTransaction(async ()=>{
+            const deletedQueue = await Queue.findOneAndDelete(
+            {
+                _id: queueId,
+                createdBy: userId
+            }).session(session);
+        if (!deletedQueue) {
+            throw new AppError("queue not found", 404, 'fail');
+        }
+        //delete related tickets when queue deleted
+        await Ticket.deleteMany({ queue: queueId },{session});
+        return deletedQueue;
+        });
+        return result;
+    } finally {
+        await session.endSession();
     }
-    //delete related tickets when queue deleted
-    await Ticket.deleteMany({queue:queueId});
-    return deletedQueue;
 }
 
 const cancelTicket = async (ticketId, userId) => {//rather than delete
-    const ticket = await Ticket.findOneAndUpdate({// atomic operation
-        _id: ticketId,
-        owner: userId,
-        status: 'waiting'
-    }, {
-        $set: { status: 'canceled' }// cancel ticket when it found 
-        //to avoid execute this operation two times or more for the same ticket befor update it
-    });
-    if (!ticket) {
-        throw new AppError('no tickets found or it was canceled', 400, 'fail');
+    const session = await mongoose.startSession();
+    try {
+        const result = await session.withTransaction(async () => {
+            const ticket = await Ticket.findOneAndUpdate({// atomic operation
+                _id: ticketId,
+                owner: userId,
+                status: 'waiting'
+            }, {
+                $set: { status: 'canceled' }// cancel ticket when it found 
+                //to avoid execute this operation two times or more for the same ticket befor update it
+            }).session(session);
+            if (!ticket) {
+                throw new AppError('no tickets found or it was canceled', 400, 'fail');
+            }
+            const queue = await Queue.findByIdAndUpdate(
+                ticket.queue,
+                {
+                    $inc: { currentLength: -1 }
+                }).session(session);
+            if (!queue) {
+                throw new AppError('no queue found!', 404, 'fail');
+            }
+            return ticket;
+        });
+        return result;
+    } finally {
+        await session.endSession();
     }
-    const queue = await Queue.findByIdAndUpdate(ticket.queue, { $inc: { currentLength: -1 } });
-    if (!queue) {
-        throw new AppError('no queue found!', 404, 'fail');
-    }
-    return ticket;
 }
 
-const toggleQueueStatus = async (queueId, userId) => {
-    const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
-    if (!queue) {
-        throw new AppError('no queue found!', 404, 'fail');
+const setQueueStatus = async (queueId, userId, newStatus) => {
+    const oldStatus = newStatus=='open'? 'closed':'open';
+    const updatedQueue = await Queue.findOneAndUpdate(
+        {
+            _id:queueId,
+            createdBy:userId,
+            status:oldStatus
+        }, {
+            status: newStatus
+        }, { runValidators: true, returnDocument: 'after' }
+    );
+    if(!updatedQueue){
+        throw new AppError(`queue is not found or it's ${newStatus}`, 404, 'fail');
     }
-    let newStatus = 'open';
-    if (queue.status === 'open') {
-        newStatus = 'closed';
-    }
-    const updatedQueue = await Queue.findByIdAndUpdate(queueId, { status: newStatus }, { runValidators: true, returnDocument: 'after' });
     return updatedQueue;
 }
 
 const activateQueue = async (queueId, userId) => {
-    const queue = await Queue.findOne({ _id: queueId, createdBy: userId, currentTurn: null });
-    if (!queue) {
-        throw new AppError('queue not found or already activated', 400, 'fail');
-    }
-    const firstTicket = await getNextWaitingTicket({ queue: queueId, prev: null });
-    if (!firstTicket) {
-        throw new AppError('no tickets found', 404, 'fail');
-    }
-    const currentServingTicket = await Ticket.findOneAndUpdate({_id:firstTicket._id, status:'waiting'}, { status: 'serving' }, { runValidators: true, returnDocument: 'after' });
-    if(!currentServingTicket){
-        throw new AppError('ticket status changed, try again', 409, 'fail');
-    }
-    const activeQueue = await Queue.findOneAndUpdate( //atomic operation
-        {
-            _id: queueId,
-            createdBy: userId,
-            currentTurn: null
-        },
-        {
-            $set: { currentTurn: firstTicket._id }, //to update current turn onr time only
-            $inc: { currentLength: -1 }
-        },
-        {
-            returnDocument: 'after'
+    const session = await mongoose.startSession();
+    try {
+        const result = await session.withTransaction(async()=>{
+             const queue = await Queue.findOne(
+            { _id: queueId, createdBy: userId, currentTurn: null }
+        );
+        if (!queue) {
+            throw new AppError('queue not found or already activated', 400, 'fail');
         }
-    );
-    if (!activeQueue) {
-        throw new AppError('queue not found or already activated', 400, 'fail');
+        const firstTicket = await getNextWaitingTicket({ queue: queueId, prev: null });
+        if (!firstTicket) {
+            throw new AppError('no tickets found', 404, 'fail');
+        }
+        const currentServingTicket = await Ticket.findOneAndUpdate(
+            { _id: firstTicket._id, status: 'waiting' },
+            { status: 'serving' }, 
+            { runValidators: true, returnDocument: 'after' }).session(session);
+        if (!currentServingTicket) {
+            throw new AppError('ticket status changed, try again', 409, 'fail');
+        }
+        const activeQueue = await Queue.findOneAndUpdate( //atomic operation
+            {
+                _id: queueId,
+                createdBy: userId,
+                currentTurn: null
+            },
+            {
+                $set: { currentTurn: firstTicket._id }, //to update current turn onr time only
+                $inc: { currentLength: -1 }
+            },
+            {
+                returnDocument: 'after'
+            }
+        ).session(session);
+        if (!activeQueue) {
+            throw new AppError('queue not found or already activated', 400, 'fail');
+        }
+        return {activeQueue,currentServingTicket}
+        });
+        notifyTurnChange(result.currentServingTicket).catch((error) => {
+            console.error(error.message);
+        });
+        return result.activeQueue;
+    } finally {
+        await session.endSession();
     }
-    notifyTurnChange(currentServingTicket).catch((error)=>{
-        console.error(error.message);
-    });
-    return activeQueue;
 }
 
 const swapToNextTicket = async (queueId, userId) => {
-    const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
-    if (!queue) {
-        throw new AppError('no queue found!', 404, 'fail');
-    }
-    if (!queue.currentTurn) {
-        throw new AppError('queue is not activated yet!', 400, 'fail');
-    }
-    await Ticket.findOneAndUpdate({
-        _id: queue.currentTurn,
-        status: 'serving',
-    }, {
-        $set: { status: 'finished' },
-    },
-        { returnDocument: 'after' }
-    );
-    const nextTicketServing = await getNextWaitingTicket({ prev: queue.currentTurn, queue: queueId });
-    if (!nextTicketServing) {
-        throw new AppError('no more tickets queue is finished', 404, 'fail');
-    }
-    const currentServingTicket = await Ticket.findOneAndUpdate(
-        {
-            _id:nextTicketServing._id,
-            status:'waiting'
+    const session = await mongoose.startSession();
+    try {
+        const result = await session.withTransaction(async ()=>{
+            const queue = await Queue.findOne({ _id: queueId, createdBy: userId });
+        if (!queue) {
+            throw new AppError('no queue found!', 404, 'fail');
+        }
+        if (!queue.currentTurn) {
+            throw new AppError('queue is not activated yet!', 400, 'fail');
+        }
+        await Ticket.findOneAndUpdate({
+            _id: queue.currentTurn,
+            status: 'serving',
+        }, {
+            $set: { status: 'finished' },
         },
-        {
-            status: 'serving'
-        }, {
-        runValidators: true,
-        returnDocument: 'after'
-    });
-    if(!currentServingTicket){
-        throw new AppError('ticket status changed, try again', 409,'fail')
+            { returnDocument: 'after' }
+        ).session(session);
+        const nextTicketServing = await getNextWaitingTicket({ prev: queue.currentTurn, queue: queueId });
+        if (!nextTicketServing) {
+            throw new AppError('no more tickets queue is finished', 404, 'fail');
+        }
+        const currentServingTicket = await Ticket.findOneAndUpdate(
+            {
+                _id: nextTicketServing._id,
+                status: 'waiting'
+            },
+            {
+                status: 'serving'
+            }, {
+            runValidators: true,
+            returnDocument: 'after'
+        }).session(session);
+        if (!currentServingTicket) {
+            throw new AppError('ticket status changed, try again', 409, 'fail')
+        }
+        const updatedQueue = await Queue.findByIdAndUpdate(
+            queueId,
+            {
+                currentTurn: nextTicketServing._id,
+                $inc: { currentLength: -1 }
+            }, {
+            runValidators: true,
+            returnDocument: 'after'
+        }
+        ).session(session);
+        await session.commitTransaction();
+        return {updatedQueue,currentServingTicket};
+        });
+        notifyTurnChange(result.currentServingTicket).catch((error) => {
+            console.error(error.message);
+        });
+        return result.updatedQueue;
+    } finally {
+        await session.endSession();
     }
-    const updatedQueue = await Queue.findByIdAndUpdate(
-        queueId,
-        {
-            currentTurn: nextTicketServing._id,
-            $inc: { currentLength: -1 }
-        }, {
-        runValidators: true,
-        returnDocument: 'after'
-    }
-    );
-    notifyTurnChange(currentServingTicket).catch((error)=>{
-        console.error(error.message);
-    });
-    return updatedQueue;
 }
 
 module.exports = {
@@ -277,7 +339,7 @@ module.exports = {
     getAllTicketsInQueue,
     updateQueue,
     cancelTicket,
-    toggleQueueStatus,
+    setQueueStatus,
     activateQueue,
     swapToNextTicket,
     getUserTickets,

@@ -33,7 +33,9 @@ router.route('/:queueId')
     .patch(
         verifyToken.verifyAuth,
         verifyToken.authorizeQueueManager,
-        queueControllers.toggleQueueStatus
+        queueValidator.queueStausValidator(),
+        validationHandler,
+        queueControllers.setQueueStatus
     )
     .delete(
         verifyToken.verifyAuth,

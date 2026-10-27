@@ -40,7 +40,19 @@ const updateQueueValidator=()=>{
     ]
 }
 
+const queueStausValidator = ()=>{
+    return[
+        body('status')
+        .isString()
+            .isIn(['open', 'closed'])
+            .withMessage('status must be open or closed')
+            .notEmpty()
+            .withMessage('status is required')
+    ]
+}
+
 module.exports = {
     createQueueValidator,
-    updateQueueValidator
+    updateQueueValidator,
+    queueStausValidator
 }

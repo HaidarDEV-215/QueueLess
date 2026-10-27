@@ -14,9 +14,12 @@ router.route('/me')
         usersProfilesControllers.updateUser
     )
     .delete(
-        //make admin can delete any account
         verifyToken.verifyAuth,
         usersProfilesControllers.deleteUser
+    )
+    .get(
+        verifyToken.verifyAuth,
+        usersProfilesControllers.getMyAccountData
     )
 
 module.exports = router;

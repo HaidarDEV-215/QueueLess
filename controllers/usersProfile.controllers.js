@@ -21,8 +21,15 @@ const updateUser= asyncWrapper(async (req,res,next)=>{
     res.status(200).json({message:"user updated successfully",data:updatedUser});
 });
 
+const getMyAccountData = asyncWrapper(async (req,res,next)=>{
+    const userId = req.currentUser.id;
+    const userData = await userServices.getUserAccountData(userId);
+    res.status(200).json({userData});
+})
+
 module.exports = {
     getAllUsers,
     deleteUser,
-    updateUser
+    updateUser,
+    getMyAccountData
 }
